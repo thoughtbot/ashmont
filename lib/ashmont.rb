@@ -1,5 +1,6 @@
 require "ashmont/version"
 require "ashmont/subscription"
+require "ashmont/customer"
 
 module Ashmont
   class << self
