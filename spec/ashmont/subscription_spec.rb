@@ -6,7 +6,7 @@ describe Ashmont::Subscription do
       token = 'xyz'
       remote_subscription = stub("remote-subscription", delegated_method => "expected")
       Braintree::Subscription.stubs(:find => remote_subscription)
-      subscription = Ashmont::Subscription.new(:token => token)
+      subscription = Ashmont::Subscription.new(token)
       result = subscription.send(delegated_method)
       Braintree::Subscription.should have_received(:find).with(token)
       result.should == "expected"
@@ -24,7 +24,7 @@ describe Ashmont::Subscription do
   end
 
   it "returns the token" do
-    subscription = Ashmont::Subscription.new(:token => 'abc')
+    subscription = Ashmont::Subscription.new('abc')
     subscription.token.should == 'abc'
   end
 
@@ -37,7 +37,7 @@ describe Ashmont::Subscription do
     Braintree::Subscription.stubs(:retry_charge => retry_result)
     Braintree::Transaction.stubs(:submit_for_settlement => settlement_result)
 
-    subscription = Ashmont::Subscription.new(:token => subscription_token)
+    subscription = Ashmont::Subscription.new(subscription_token)
     subscription.retry_charge.should be_true
     subscription.errors.should be_empty
 
@@ -57,7 +57,7 @@ describe Ashmont::Subscription do
     Braintree::Transaction.stubs(:submit_for_settlement => settlement_result)
     Ashmont::Errors.stubs(:new => errors)
 
-    subscription = Ashmont::Subscription.new(:token => subscription_token)
+    subscription = Ashmont::Subscription.new(subscription_token)
     subscription.retry_charge.should be_false
     subscription.errors.should == errors
 
@@ -70,8 +70,8 @@ describe Ashmont::Subscription do
     token = 'xyz'
     Braintree::Subscription.stubs(:update => 'expected')
 
-    subscription = Ashmont::Subscription.new(:token => token, :name => "Billy")
-    result = subscription.save
+    subscription = Ashmont::Subscription.new(token)
+    result = subscription.save(:name => "Billy")
 
     Braintree::Subscription.should have_received(:update).with(token, :name => "Billy")
     result.should == "expected"
@@ -84,8 +84,8 @@ describe Ashmont::Subscription do
     result = stub("result", :subscription => remote_subscription, :success? => true)
     Braintree::Subscription.stubs(:create => result)
 
-    subscription = Ashmont::Subscription.new(attributes)
-    subscription.save.should be_true
+    subscription = Ashmont::Subscription.new
+    subscription.save(attributes).should be_true
 
     Braintree::Subscription.should have_received(:create).with(attributes)
     subscription.token.should == token

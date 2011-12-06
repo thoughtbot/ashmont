@@ -6,19 +6,18 @@ module Ashmont
   class Subscription
     attr_reader :token, :errors
 
-    def initialize(attributes = {})
-      @attributes = attributes.except(:token)
-      @token = attributes[:token]
+    def initialize(token = nil)
+      @token = token
       @errors = {}
     end
 
     delegate :transactions, :status, :to => :remote_subscription
 
-    def save
+    def save(attributes)
       if token
-        update
+        update(attributes)
       else
-        create
+        create(attributes)
       end
     end
 
@@ -48,8 +47,8 @@ module Ashmont
 
     private
 
-    def create
-      result = Braintree::Subscription.create(@attributes)
+    def create(attributes)
+      result = Braintree::Subscription.create(attributes)
       if result.success?
         @token = result.subscription.id
         @remote_subscription = result.subscription
@@ -59,9 +58,9 @@ module Ashmont
       end
     end
 
-    def update
+    def update(attributes)
       @remote_subscription = nil
-      Braintree::Subscription.update(token, @attributes)
+      Braintree::Subscription.update(token, attributes)
     end
 
     def remote_subscription
