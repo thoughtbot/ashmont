@@ -66,6 +66,20 @@ describe Ashmont::Subscription do
     Ashmont::Errors.should have_received(:new).with(transaction, error_messages)
   end
 
+  it "reloads the subscription after retrying a charge" do
+    transaction = stub("transaction", :id => 'abc')
+    retry_result = stub("retry-result", :transaction => transaction)
+    settlement_result = stub("settlement-result", :success? => true)
+    past_due_subscription = stub("subscription", :status=> "past_due")
+    active_subscription = stub("subscription", :status=> "active")
+    Braintree::Subscription.stubs(:retry_charge => retry_result)
+    Braintree::Transaction.stubs(:submit_for_settlement => settlement_result)
+    Braintree::Subscription.stubs(:find).returns(past_due_subscription).then.returns(active_subscription)
+
+    subscription = Ashmont::Subscription.new('xyz')
+    expect { subscription.retry_charge }.to change { subscription.status }.from("past_due").to("active")
+  end
+
   it "updates a subscription" do
     token = 'xyz'
     Braintree::Subscription.stubs(:update => 'expected')
@@ -73,7 +87,7 @@ describe Ashmont::Subscription do
     subscription = Ashmont::Subscription.new(token)
     result = subscription.save(:name => "Billy")
 
-    Braintree::Subscription.should have_received(:update).with(token, :name => "Billy")
+    Braintree::Subscription.should have_received(:update).with(token, has_entries(:name => "Billy"))
     result.should == "expected"
   end
 
@@ -87,9 +101,33 @@ describe Ashmont::Subscription do
     subscription = Ashmont::Subscription.new
     subscription.save(attributes).should be_true
 
-    Braintree::Subscription.should have_received(:create).with(attributes)
+    Braintree::Subscription.should have_received(:create).with(has_entries(attributes))
     subscription.token.should == token
     subscription.status.should == "fine"
+  end
+
+  it "passes a configured merchant account id" do
+    remote_subscription = stub('remote-subscription', :id => "xyz", :status => "fine")
+    result = stub("result", :subscription => remote_subscription, :success? => true)
+    Braintree::Subscription.stubs(:create => result)
+
+    with_configured_merchant_acount_id do |merchant_account_id|
+      subscription = Ashmont::Subscription.new
+      subscription.save({})
+
+      Braintree::Subscription.should have_received(:create).with(has_entries(:merchant_account_id => merchant_account_id))
+    end
+  end
+
+  it "doesn't pass a merchant account id when not is configured" do
+    remote_subscription = stub('remote-subscription', :id => "xyz", :status => "fine")
+    result = stub("result", :subscription => remote_subscription, :success? => true)
+    Braintree::Subscription.stubs(:create => result)
+
+    subscription = Ashmont::Subscription.new
+    subscription.save({})
+
+    Braintree::Subscription.should have_received(:create).with(has_entries(:merchant_account_id => nil)).never
   end
 
   it "returns the most recent transaction" do
@@ -112,5 +150,13 @@ describe Ashmont::Subscription do
       subscription = Ashmont::Subscription.new(:token => 'xyz')
       subscription.status.should == "old"
       subscription.reload.status.should == "new"
+  end
+
+  def with_configured_merchant_acount_id
+    merchant_account_id = "jkl"
+    Ashmont.merchant_account_id = merchant_account_id
+    yield merchant_account_id
+  ensure
+    Ashmont.merchant_account_id = nil
   end
 end

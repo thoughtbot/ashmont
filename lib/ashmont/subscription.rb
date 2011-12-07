@@ -14,16 +14,18 @@ module Ashmont
     delegate :transactions, :status, :to => :remote_subscription
 
     def save(attributes)
+      attributes_for_merchant = add_merchant_to_attributes(attributes)
       if token
-        update(attributes)
+        update(attributes_for_merchant)
       else
-        create(attributes)
+        create(attributes_for_merchant)
       end
     end
 
     def retry_charge
       transaction = Braintree::Subscription.retry_charge(token).transaction
       result = Braintree::Transaction.submit_for_settlement(transaction.id)
+      reload
       if result.success?
         true
       else
@@ -46,6 +48,14 @@ module Ashmont
     end
 
     private
+
+    def add_merchant_to_attributes(attributes)
+      if Ashmont.merchant_account_id
+        attributes.merge(:merchant_account_id => Ashmont.merchant_account_id)
+      else
+        attributes
+      end
+    end
 
     def create(attributes)
       result = Braintree::Subscription.create(attributes)
