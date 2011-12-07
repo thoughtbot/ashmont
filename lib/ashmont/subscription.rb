@@ -53,6 +53,10 @@ module Ashmont
       self
     end
 
+    def past_due?
+      status == Braintree::Subscription::Status::PastDue
+    end
+
     private
 
     def remote_status

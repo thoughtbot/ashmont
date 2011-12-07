@@ -171,6 +171,14 @@ describe Ashmont::Subscription do
     subscription.status.should == "active"
   end
 
+  it "is past due with a past due status" do
+    Ashmont::Subscription.new("xyz", :status => Braintree::Subscription::Status::PastDue).should be_past_due
+  end
+
+  it "isn't past due with an active status" do
+    Ashmont::Subscription.new("xyz", :status => Braintree::Subscription::Status::Active).should_not be_past_due
+  end
+
   def with_configured_merchant_acount_id
     merchant_account_id = "jkl"
     Ashmont.merchant_account_id = merchant_account_id
