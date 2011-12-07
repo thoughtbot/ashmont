@@ -3,20 +3,17 @@ require 'spec_helper'
 describe Ashmont::Subscription do
   %w(transactions).each do |delegated_method|
     it "delegates ##{delegated_method} to the remote subscription" do
-      token = 'xyz'
-      remote_subscription = stub("remote-subscription", delegated_method => "expected")
-      Braintree::Subscription.stubs(:find => remote_subscription)
-      subscription = Ashmont::Subscription.new(token)
+      remote_subscription = stub_remote_subscription(delegated_method => "expected")
+      subscription = Ashmont::Subscription.new(remote_subscription.id)
       result = subscription.send(delegated_method)
-      Braintree::Subscription.should have_received(:find).with(token)
+      Braintree::Subscription.should have_received(:find).with(remote_subscription.id)
       result.should == "expected"
     end
   end
 
   it "converts the next billing date into the configured timezone" do
     unconverted_date = "2011-01-20"
-    remote_subscription = stub("remote-subscription", :next_billing_date => unconverted_date)
-    Braintree::Subscription.stubs(:find => remote_subscription)
+    remote_subscription = stub_remote_subscription(:next_billing_date => unconverted_date)
     subscription = Ashmont::Subscription.new("xyz")
     result = subscription.next_billing_date
     result.utc_offset.should == ActiveSupport::TimeZone[Ashmont.merchant_account_time_zone].utc_offset
@@ -93,8 +90,7 @@ describe Ashmont::Subscription do
 
   it "creates a successful subscription" do
     attributes = { "test" => "hello" }
-    token = "xyz"
-    remote_subscription = stub('remote-subscription', :id => token, :status => "fine")
+    remote_subscription = stub_remote_subscription(:status => "fine")
     result = stub("result", :subscription => remote_subscription, :success? => true)
     Braintree::Subscription.stubs(:create => result)
 
@@ -102,12 +98,12 @@ describe Ashmont::Subscription do
     subscription.save(attributes).should be_true
 
     Braintree::Subscription.should have_received(:create).with(has_entries(attributes))
-    subscription.token.should == token
+    subscription.token.should == remote_subscription.id
     subscription.status.should == "fine"
   end
 
   it "passes a configured merchant account id" do
-    remote_subscription = stub('remote-subscription', :id => "xyz", :status => "fine")
+    remote_subscription = stub_remote_subscription(:id => "xyz", :status => "fine")
     result = stub("result", :subscription => remote_subscription, :success? => true)
     Braintree::Subscription.stubs(:create => result)
 
@@ -120,7 +116,7 @@ describe Ashmont::Subscription do
   end
 
   it "doesn't pass a merchant account id when not is configured" do
-    remote_subscription = stub('remote-subscription', :id => "xyz", :status => "fine")
+    remote_subscription = stub_remote_subscription(:id => "xyz", :status => "fine")
     result = stub("result", :subscription => remote_subscription, :success? => true)
     Braintree::Subscription.stubs(:create => result)
 
@@ -134,8 +130,7 @@ describe Ashmont::Subscription do
     Timecop.freeze(Time.now) do
       dates = [2.days.ago, 3.days.ago, 1.day.ago]
       transactions = dates.map { |date| stub("transaction", :created_at => date) }
-      remote_subscription = stub("remote-subscription", :transactions => transactions)
-      Braintree::Subscription.stubs(:find => remote_subscription)
+      remote_subscription = stub_remote_subscription(:transactions => transactions)
 
       subscription = Ashmont::Subscription.new("xyz")
 
@@ -144,10 +139,10 @@ describe Ashmont::Subscription do
   end
 
   it "reloads remote data" do
-    old_remote_subscription = stub("old-remote-subscription", :status => "old")
-    new_remote_subscription = stub("new-remote-subscription", :status => "new")
+    old_remote_subscription = stub_remote_subscription(:status => "old")
+    new_remote_subscription = stub_remote_subscription(:status => "new")
     Braintree::Subscription.stubs(:find).returns(old_remote_subscription).then.returns(new_remote_subscription)
-    subscription = Ashmont::Subscription.new(:token => 'xyz')
+    subscription = Ashmont::Subscription.new(old_remote_subscription.id)
     subscription.status.should == "old"
     subscription.reload.status.should == "new"
   end
@@ -188,6 +183,7 @@ describe Ashmont::Subscription do
     stub(
       "remote_subscription",
       {
+        :transactions => [],
         :status => "active",
         :id => "abcdef"
       }.update(options)
