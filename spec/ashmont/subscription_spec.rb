@@ -1,7 +1,7 @@
 require 'spec_helper'
 
 describe Ashmont::Subscription do
-  %w(transactions status).each do |delegated_method|
+  %w(transactions).each do |delegated_method|
     it "delegates ##{delegated_method} to the remote subscription" do
       token = 'xyz'
       remote_subscription = stub("remote-subscription", delegated_method => "expected")
@@ -17,7 +17,7 @@ describe Ashmont::Subscription do
     unconverted_date = "2011-01-20"
     remote_subscription = stub("remote-subscription", :next_billing_date => unconverted_date)
     Braintree::Subscription.stubs(:find => remote_subscription)
-    subscription = Ashmont::Subscription.new
+    subscription = Ashmont::Subscription.new("xyz")
     result = subscription.next_billing_date
     result.utc_offset.should == ActiveSupport::TimeZone[Ashmont.merchant_account_time_zone].utc_offset
     result.strftime("%Y-%m-%d").should == unconverted_date
@@ -70,8 +70,8 @@ describe Ashmont::Subscription do
     transaction = stub("transaction", :id => 'abc')
     retry_result = stub("retry-result", :transaction => transaction)
     settlement_result = stub("settlement-result", :success? => true)
-    past_due_subscription = stub("subscription", :status=> "past_due")
-    active_subscription = stub("subscription", :status=> "active")
+    past_due_subscription = stub("subscription", :status => "past_due")
+    active_subscription = stub("subscription", :status => "active")
     Braintree::Subscription.stubs(:retry_charge => retry_result)
     Braintree::Transaction.stubs(:submit_for_settlement => settlement_result)
     Braintree::Subscription.stubs(:find).returns(past_due_subscription).then.returns(active_subscription)
@@ -137,19 +137,43 @@ describe Ashmont::Subscription do
       remote_subscription = stub("remote-subscription", :transactions => transactions)
       Braintree::Subscription.stubs(:find => remote_subscription)
 
-      subscription = Ashmont::Subscription.new
+      subscription = Ashmont::Subscription.new("xyz")
 
       subscription.most_recent_transaction.created_at.should == 1.day.ago
     end
   end
 
   it "reloads remote data" do
-      old_remote_subscription = stub("old-remote-subscription", :status => "old")
-      new_remote_subscription = stub("new-remote-subscription", :status => "new")
-      Braintree::Subscription.stubs(:find).returns(old_remote_subscription).then.returns(new_remote_subscription)
-      subscription = Ashmont::Subscription.new(:token => 'xyz')
-      subscription.status.should == "old"
-      subscription.reload.status.should == "new"
+    old_remote_subscription = stub("old-remote-subscription", :status => "old")
+    new_remote_subscription = stub("new-remote-subscription", :status => "new")
+    Braintree::Subscription.stubs(:find).returns(old_remote_subscription).then.returns(new_remote_subscription)
+    subscription = Ashmont::Subscription.new(:token => 'xyz')
+    subscription.status.should == "old"
+    subscription.reload.status.should == "new"
+  end
+
+  it "finds status from the remote subscription" do
+    remote_subscription = stub_remote_subscription(:status => "a-ok")
+    subscription = Ashmont::Subscription.new("xyz")
+    subscription.status.should == "a-ok"
+  end
+
+  it "doesn't have status without a remote subscription" do
+    subscription = Ashmont::Subscription.new(nil)
+    subscription.status.should be_nil
+  end
+
+  it "uses a cached status when provided" do
+    remote_subscription = stub_remote_subscription(:status => "past-due")
+    subscription = Ashmont::Subscription.new("xyz", :status => "a-ok")
+    subscription.status.should == "a-ok"
+  end
+
+  it "updates the cached status when reloading" do
+    remote_subscription = stub_remote_subscription(:status => "active")
+    subscription = Ashmont::Subscription.new("xyz", :status => "past-due")
+    subscription.reload
+    subscription.status.should == "active"
   end
 
   def with_configured_merchant_acount_id
@@ -158,5 +182,15 @@ describe Ashmont::Subscription do
     yield merchant_account_id
   ensure
     Ashmont.merchant_account_id = nil
+  end
+
+  def stub_remote_subscription(options = {})
+    stub(
+      "remote_subscription",
+      {
+        :status => "active",
+        :id => "abcdef"
+      }.update(options)
+    ).tap { |subscription| Braintree::Subscription.stubs(:find => subscription) }
   end
 end

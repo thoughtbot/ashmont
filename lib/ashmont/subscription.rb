@@ -6,12 +6,17 @@ module Ashmont
   class Subscription
     attr_reader :token, :errors
 
-    def initialize(token = nil)
+    def initialize(token = nil, cached_attributes = {})
       @token = token
+      @cached_attributes = cached_attributes
       @errors = {}
     end
 
-    delegate :transactions, :status, :to => :remote_subscription
+    delegate :transactions, :to => :remote_subscription, :allow_nil => true
+
+    def status
+      @cached_attributes[:status] || remote_status
+    end
 
     def save(attributes)
       attributes_for_merchant = add_merchant_to_attributes(attributes)
@@ -44,10 +49,15 @@ module Ashmont
 
     def reload
       @remote_subscription = nil
+      @cached_attributes = {}
       self
     end
 
     private
+
+    def remote_status
+      remote_subscription.status if remote_subscription
+    end
 
     def add_merchant_to_attributes(attributes)
       if Ashmont.merchant_account_id
@@ -74,7 +84,13 @@ module Ashmont
     end
 
     def remote_subscription
-      @remote_subscription ||= Braintree::Subscription.find(token)
+      @remote_subscription ||= find_remote_subscription
+    end
+
+    def find_remote_subscription
+      if token
+        Braintree::Subscription.find(token)
+      end
     end
 
     def merchant_account_time_zone
