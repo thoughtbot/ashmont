@@ -44,7 +44,7 @@ module Ashmont
     end
 
     def next_billing_date
-      merchant_account_time_zone.parse(remote_subscription.next_billing_date)
+      merchant_account_time_zone.parse(remote_subscription.next_billing_date) if remote_subscription
     end
 
     def reload

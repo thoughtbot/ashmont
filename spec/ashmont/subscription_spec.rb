@@ -20,6 +20,10 @@ describe Ashmont::Subscription do
     result.strftime("%Y-%m-%d").should == unconverted_date
   end
 
+  it "doesn't have a next billing date without a remote subscription" do
+    Ashmont::Subscription.new.next_billing_date.should be_nil
+  end
+
   it "returns the token" do
     subscription = Ashmont::Subscription.new('abc')
     subscription.token.should == 'abc'
