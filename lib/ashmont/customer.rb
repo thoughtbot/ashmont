@@ -77,6 +77,10 @@ module Ashmont
       credit_card.billing_address.country_name if credit_card
     end
 
+    def confirm(query_string)
+      handle_result Braintree::TransparentRedirect.confirm(query_string)
+    end
+
     private
 
     def create_or_update(attributes)

@@ -235,4 +235,36 @@ describe Ashmont::Customer do
       Ashmont::Customer.new("xyz").send(billing_address_attribute).should == "expected"
     end
   end
+
+  it "confirms a transparent redirect query string" do
+    token = "xyz"
+    query_string = "abcmagic"
+    remote_customer = stub("customer", :credit_cards => [], :id => token)
+    confirm_result = stub("result", :success? => true, :customer => remote_customer)
+    Braintree::TransparentRedirect.stubs(:confirm => confirm_result)
+
+    customer = Ashmont::Customer.new
+    customer.confirm(query_string).should be_true
+
+    Braintree::TransparentRedirect.should have_received(:confirm).with(query_string)
+    customer.token.should == token
+  end
+
+  it "adds errors for an invalid transparent redirect query string" do
+    error_messages = "error messages"
+    errors = "errors"
+    verification = "failure"
+    confirm_result = stub("result",
+                          :success? => false,
+                          :errors => error_messages,
+                          :credit_card_verification => verification)
+    Braintree::TransparentRedirect.stubs(:confirm => confirm_result)
+    Ashmont::Errors.stubs(:new => errors)
+
+    customer = Ashmont::Customer.new
+    customer.confirm("abc").should be_false
+
+    Ashmont::Errors.should have_received(:new).with(verification, error_messages)
+    customer.errors.should == errors
+  end
 end
