@@ -1,5 +1,9 @@
 module Ashmont
   class Customer
+    CREDIT_CARD_ATTRIBUTES = [:cardholder_name, :number, :cvv, :expiration_month, :expiration_year].freeze
+    ADDRESS_ATTRIBUTES = [:street_address, :extended_address, :locality, :region, :postal_code, :country_name].freeze
+    BILLING_ATTRIBUTES = (CREDIT_CARD_ATTRIBUTES + ADDRESS_ATTRIBUTES).freeze
+
     attr_reader :token, :errors
 
     def initialize(token = nil)
@@ -76,11 +80,30 @@ module Ashmont
     private
 
     def create_or_update(attributes)
+      remote_attributes = build_attribute_hash(attributes.symbolize_keys)
       if persisted?
-        update(attributes)
+        update(remote_attributes)
       else
-        create(attributes)
+        create(remote_attributes)
       end
+    end
+
+    def build_attribute_hash(attributes)
+      result = { :email => attributes[:email] }
+      if BILLING_ATTRIBUTES.any? { |attribute| attributes[attribute].present? }
+        result[:credit_card] = CREDIT_CARD_ATTRIBUTES.inject({}) do |credit_card_attributes, attribute|
+          credit_card_attributes.update(attribute => attributes[attribute])
+        end
+        result[:credit_card][:billing_address] = ADDRESS_ATTRIBUTES.inject({}) do |address_attributes, attribute|
+          address_attributes.update(attribute => attributes[attribute])
+        end
+        if payment_method_token
+          result[:credit_card][:options] = { :update_existing_token => payment_method_token }
+        end
+      else
+        result[:credit_card] = {}
+      end
+      result
     end
 
     def create(attributes)

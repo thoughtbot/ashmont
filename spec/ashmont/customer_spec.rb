@@ -38,9 +38,52 @@ describe Ashmont::Customer do
     customer = Ashmont::Customer.new
     customer.save(attributes).should be_true
 
-    Braintree::Customer.should have_received(:create).with(attributes)
+    Braintree::Customer.should have_received(:create).with(:email => "ben@example.com", :credit_card => {})
     customer.token.should == token
     customer.errors.should be_empty
+  end
+
+  it "creates a remote customer with a credit card" do
+    token = "xyz"
+    remote_customer = stub("customer", :credit_cards => [], :id => token)
+    create_result = stub("result", :success? => true, :customer => remote_customer)
+    attributes = { "email" => "ben@example.com" }
+    Braintree::Customer.stubs(:create => create_result)
+
+    customer = Ashmont::Customer.new
+    customer.save(
+      :email => "jrobot@example.com",
+      :cardholder_name => "Jim Robot", 
+      :number => "4111111111111115",
+      :cvv => "123",
+      :expiration_month => 5,
+      :expiration_year => 2013,
+      :street_address => "1 E Main St",
+      :extended_address => "Suite 3",
+      :locality => "Chicago",
+      :region => "Illinois",
+      :postal_code => "60622",
+      :country_name => "United States of America"
+    )
+
+    Braintree::Customer.should have_received(:create).with(
+      :email => "jrobot@example.com",
+      :credit_card => {
+        :cardholder_name => "Jim Robot",
+        :number => "4111111111111115",
+        :cvv => "123",
+        :expiration_month => 5,
+        :expiration_year => 2013,
+        :billing_address => {
+          :street_address => "1 E Main St",
+          :extended_address => "Suite 3",
+          :locality => "Chicago",
+          :region => "Illinois",
+          :postal_code => "60622",
+          :country_name => "United States of America"
+        }
+      }
+    )
   end
 
   it "returns errors while creating an invalid remote customer" do
@@ -71,8 +114,57 @@ describe Ashmont::Customer do
     customer = Ashmont::Customer.new(token)
     customer.save(updates).should be_true
 
-    Braintree::Customer.should have_received(:update).with(token, updates)
+    Braintree::Customer.should have_received(:update).with(token, :email => "somebody@example.com", :credit_card => {})
     customer.billing_email.should == "somebody@example.com"
+  end
+
+  it "updates a remote customer with a credit card" do
+    token = "xyz"
+    payment_method_token = "abc"
+    credit_card = stub("credit_card", :token => payment_method_token)
+    remote_customer = stub("customer", :credit_cards => [credit_card], :id => token)
+    update_result = stub("result", :success? => true, :customer => remote_customer)
+    Braintree::Customer.stubs(:update => update_result)
+    Braintree::Customer.stubs(:find => remote_customer)
+
+    customer = Ashmont::Customer.new(token)
+    customer.save(
+      :email => "jrobot@example.com",
+      :cardholder_name => "Jim Robot", 
+      :number => "4111111111111115",
+      :cvv => "123",
+      :expiration_month => 5,
+      :expiration_year => 2013,
+      :street_address => "1 E Main St",
+      :extended_address => "Suite 3",
+      :locality => "Chicago",
+      :region => "Illinois",
+      :postal_code => "60622",
+      :country_name => "United States of America"
+    )
+
+    Braintree::Customer.should have_received(:update).with(
+      token,
+      :email => "jrobot@example.com",
+      :credit_card => {
+        :cardholder_name => "Jim Robot",
+        :number => "4111111111111115",
+        :cvv => "123",
+        :expiration_month => 5,
+        :expiration_year => 2013,
+        :billing_address => {
+          :street_address => "1 E Main St",
+          :extended_address => "Suite 3",
+          :locality => "Chicago",
+          :region => "Illinois",
+          :postal_code => "60622",
+          :country_name => "United States of America"
+        },
+        :options => {
+          :update_existing_token => payment_method_token
+        }
+      }
+    )
   end
 
   it "returns errors while updating an invalid customer" do
