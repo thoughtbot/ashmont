@@ -12,8 +12,14 @@ module Ashmont
     end
 
     def credit_card
+      credit_cards[0]
+    end
+
+    def credit_cards
       if persisted?
-        remote_customer.credit_cards[0]
+        remote_customer.credit_cards
+      else
+        []
       end
     end
 

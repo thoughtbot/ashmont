@@ -2,7 +2,7 @@ require 'spec_helper'
 require 'ashmont/customer'
 
 describe Ashmont::Customer do
-  it "has returns its first credit card" do
+  it "returns its first credit card" do
     token = "xyz"
     remote_customer = stub("customer", :credit_cards => ["first", "second"])
     Braintree::Customer.stubs(:find => remote_customer)
@@ -16,6 +16,22 @@ describe Ashmont::Customer do
   it "returns nothing without a remote customer" do
     Ashmont::Customer.new.credit_card.should be_nil
   end
+
+  it "returns all credit cards" do
+    token = "xyz"
+    remote_customer = stub("customer", :credit_cards => ["first", "second"])
+    Braintree::Customer.stubs(:find => remote_customer)
+
+    result = Ashmont::Customer.new(token).credit_cards
+
+    Braintree::Customer.should have_received(:find).with(token)
+    result.should == ["first", "second"]
+  end
+
+  it "returns an empty array without a remote customer" do
+    Ashmont::Customer.new.credit_cards.should == []
+  end
+
 
   it "returns the remote email" do
     remote_customer = stub("customer", :email => "admin@example.com")
