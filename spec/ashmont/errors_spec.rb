@@ -30,6 +30,12 @@ describe Ashmont::Errors do
       should include("expiration_year is unsupported")
   end
 
+  it "handles error results without a status" do
+    result = {}
+    errors = [ stub("error", :attribute => "foo", :message => "bar") ]
+    expect { Ashmont::Errors.new(result, errors).to_hash }.to_not raise_error(NoMethodError)
+  end
+
   def errors_for(options = {})
     result = stub("result",
                   :status => options[:status] || "rejected",

@@ -20,11 +20,13 @@ module Ashmont
     private
 
     def parse_result(result)
-      case result.status
-      when "processor_declined"
-        add_error :number, "was denied by the payment processor with the message: #{result.processor_response_text}"
-      when "gateway_rejected"
-        add_error :cvv, "did not match"
+      if result.respond_to?(:status)
+        case result.status
+        when "processor_declined"
+          add_error :number, "was denied by the payment processor with the message: #{result.processor_response_text}"
+        when "gateway_rejected"
+          add_error :cvv, "did not match"
+        end
       end
     end
 
