@@ -115,5 +115,5 @@ Braintree's servers during automated tests.
 License
 -------
 
-Ashmont is Copyright © 2011 thoughtbot. It is free software, and may be
+Ashmont is Copyright © 2011-2013 thoughtbot, inc. It is free software, and may be
 redistributed under the terms specified in the LICENSE file.
